@@ -33,10 +33,7 @@ void EditDialog::setBookId(int id)
     this->ui->editPengarang->setText(record.field(mBookTable->fieldIndex("Pengarang")).value().toString());
     this->ui->spinJumlahBuku->setValue(record.field(mBookTable->fieldIndex("Jml_Buku")).value().toInt());
 
-    if (!mPenerbitTable->select()) qWarning() << "Select penerbit failed";
-
-    this->ui->comboPenerbit->setModel(mPenerbitTable);
-    this->ui->comboPenerbit->setModelColumn(mPenerbitTable->fieldIndex("Nama"));
+    updatePenerbitCombo();
 
     int penerbitId = record.field(mBookTable->fieldIndex("Kode_Penerbit")).value().toInt();
     int idColumnIndexInPenerbit = mPenerbitTable->fieldIndex("Kode_Penerbit");
@@ -49,8 +46,25 @@ void EditDialog::setBookId(int id)
     }
 }
 
+void EditDialog::setAddBook()
+{
+    this->mBookId = -1;
+    updatePenerbitCombo();
+    if (!this->mBookTable->insertRows(0, 1))
+        qInfo() << "Insert row failed";
+
+    this->ui->labelKodeBuku->setText("Buku Baru");
+}
+
 void EditDialog::accept()
 {
+    if (this->mBookId == -1) {
+        QSqlQuery query;
+        query.exec("SELECT MAX(Kode_Buku) + 1 FROM Buku");
+        query.first();
+        this->mBookTable->setData(this->mBookTable->index(0, mBookTable->fieldIndex("Kode_Buku")),
+            query.value(0).toInt());
+    }
     this->mBookTable->setData(
         this->mBookTable->index(0, mBookTable->fieldIndex("Judul")),
         this->ui->editJudul->text());
@@ -65,6 +79,18 @@ void EditDialog::accept()
                         this->mPenerbitTable->record(
                             this->ui->comboPenerbit->currentIndex()
                                 ).field(mPenerbitTable->fieldIndex("Kode_Penerbit")).value().toInt());
-    this->mBookTable->submitAll();
+    if (!this->mBookTable->submitAll()) {
+
+        qWarning() << "insert failed";
+        qWarning() << mBookTable->lastError();
+    }
     done(Accepted);
+}
+
+void EditDialog::updatePenerbitCombo()
+{
+    if (!mPenerbitTable->select()) qWarning() << "Select penerbit failed";
+
+    this->ui->comboPenerbit->setModel(mPenerbitTable);
+    this->ui->comboPenerbit->setModelColumn(mPenerbitTable->fieldIndex("Nama"));
 }

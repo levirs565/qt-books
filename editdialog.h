@@ -17,6 +17,7 @@ public:
     ~EditDialog();
 
     void setBookId(int id);
+    void setAddBook();
 
 public Q_SLOTS:
     void accept() override;
@@ -26,6 +27,8 @@ private:
     int mBookId;
     QSqlTableModel *mBookTable;
     QSqlTableModel *mPenerbitTable;
+
+    void updatePenerbitCombo();
 };
 
 #endif // EDITDIALOG_H

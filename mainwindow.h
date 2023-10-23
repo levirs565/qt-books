@@ -21,6 +21,8 @@ public:
 private slots:
     void on_buttonEdit_clicked();
 
+    void on_buttonAdd_clicked();
+
 private:
     Ui::MainWindow *ui;
     QSqlRelationalTableModel *mTable;

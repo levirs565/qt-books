@@ -47,3 +47,12 @@ void MainWindow::on_buttonEdit_clicked()
     mTable->selectRow(selectedRow);
 }
 
+
+void MainWindow::on_buttonAdd_clicked()
+{
+    EditDialog edit;
+    edit.setAddBook();
+    edit.exec();
+    mTable->select();
+}
+
