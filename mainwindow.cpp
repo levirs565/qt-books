@@ -56,3 +56,18 @@ void MainWindow::on_buttonAdd_clicked()
     mTable->select();
 }
 
+
+void MainWindow::on_buttonHapus_clicked()
+{
+    QModelIndexList selected = ui->tableView->selectionModel()->selectedRows();
+    if (selected.size() != 1) {
+        return;
+    }
+
+    int selectedRow = selected.at(0).row();
+
+    mTable->removeRows(selectedRow, 1);
+    mTable->submitAll();
+    mTable->select();
+}
+
