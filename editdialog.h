@@ -2,6 +2,7 @@
 #define EDITDIALOG_H
 
 #include <QDialog>
+#include <QDataWidgetMapper>
 #include <QtSql>
 
 namespace Ui {
@@ -25,8 +26,9 @@ public Q_SLOTS:
 private:
     Ui::EditDialog *ui;
     int mBookId;
-    QSqlTableModel *mBookTable;
-    QSqlTableModel *mPenerbitTable;
+    QSqlTableModel *mBookModel;
+    QSqlTableModel *mPenerbitModel;
+    QDataWidgetMapper mBookMapper;
 
     void updatePenerbitCombo();
 };

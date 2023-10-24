@@ -1,59 +1,105 @@
 #include "editdialog.h"
 #include "ui_editdialog.h"
 
+class BookItemDelegate : public QStyledItemDelegate {
+    Q_OBJECT
+public:
+    BookItemDelegate(QObject* parent = nullptr) :
+        QStyledItemDelegate(parent) {
+    }
+
+    void setPenerbitModel(QSqlTableModel* model) {
+        mPenerbitModel = model;
+    }
+
+    void setPenerbitCombo(QComboBox* combo) {
+        mPenerbitCombo = combo;
+    }
+
+    void setEditorData(QWidget *editor, const QModelIndex &index) const {
+        if (editor == mPenerbitCombo) {
+            int penerbitFIeldIndex = mPenerbitModel->fieldIndex("Kode_Penerbit");
+            int penerbitId = index.data().toInt();
+
+            for (int i = 0; i < mPenerbitModel->rowCount(); i++) {
+                int currentPenerbitId = mPenerbitModel->record(i).field(penerbitFIeldIndex).value().toInt();
+                if (currentPenerbitId == penerbitId) {
+                    mPenerbitCombo->setCurrentIndex(i);
+                    break;
+                }
+            }
+        } else {
+            QStyledItemDelegate::setEditorData(editor, index);
+        }
+    }
+
+    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const {
+        if (editor == mPenerbitCombo) {
+            int penerbitFieldIndex = mPenerbitModel->fieldIndex("Kode_Penerbit");
+            int penerbitId = mPenerbitModel->record(mPenerbitCombo->currentIndex()).field(penerbitFieldIndex).value().toInt();
+            model->setData(index, penerbitId);
+        } else {
+            QStyledItemDelegate::setModelData(editor, model, index);
+        }
+    }
+private:
+    QSqlTableModel *mPenerbitModel;
+    QComboBox *mPenerbitCombo;
+};
+
 EditDialog::EditDialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::EditDialog),
-    mBookTable(new QSqlTableModel()),
-    mPenerbitTable(new QSqlTableModel())
+    mBookModel(new QSqlTableModel()),
+    mPenerbitModel(new QSqlTableModel())
 {
     ui->setupUi(this);
 
-    mBookTable->setTable("Buku");
-    mPenerbitTable->setTable("Penerbit");
+    mBookModel->setTable("Buku");
+    mBookModel->setEditStrategy(QSqlTableModel::OnManualSubmit);
+    mPenerbitModel->setTable("Penerbit");
+
+    mBookMapper.setModel(mBookModel);
+    BookItemDelegate *delegate = new BookItemDelegate(this);
+    delegate->setPenerbitCombo(ui->comboPenerbit);
+    delegate->setPenerbitModel(mPenerbitModel);
+    mBookMapper.setItemDelegate(delegate);
+    mBookMapper.addMapping(ui->labelKodeBuku, mBookModel->fieldIndex("Kode_Buku"));
+    mBookMapper.addMapping(ui->editJudul, mBookModel->fieldIndex("Judul"));
+    mBookMapper.addMapping(ui->editPengarang, mBookModel->fieldIndex("Pengarang"));
+    mBookMapper.addMapping(ui->spinJumlahBuku, mBookModel->fieldIndex("Jml_Buku"));
+    mBookMapper.addMapping(ui->comboPenerbit, mBookModel->fieldIndex("Kode_Penerbit"));
 }
 
 EditDialog::~EditDialog()
 {
     delete ui;
-    delete mBookTable;
+    delete mBookModel;
+    delete mPenerbitModel;
 }
 
 void EditDialog::setBookId(int id)
 {
     this->mBookId = id;
-    mBookTable->setFilter(QString("Kode_Buku = %1").arg(mBookId));
+    mBookModel->setFilter(QString("Kode_Buku = %1").arg(mBookId));
 
-    if (!mBookTable->select())
+    if (!mBookModel->select())
         qWarning() << "Select failed";
 
-    QSqlRecord record = mBookTable->record(0);
-    this->ui->labelKodeBuku->setNum(this->mBookId);
-    this->ui->editJudul->setText(record.field(mBookTable->fieldIndex("Judul")).value().toString());
-    this->ui->editPengarang->setText(record.field(mBookTable->fieldIndex("Pengarang")).value().toString());
-    this->ui->spinJumlahBuku->setValue(record.field(mBookTable->fieldIndex("Jml_Buku")).value().toInt());
-
     updatePenerbitCombo();
-
-    int penerbitId = record.field(mBookTable->fieldIndex("Kode_Penerbit")).value().toInt();
-    int idColumnIndexInPenerbit = mPenerbitTable->fieldIndex("Kode_Penerbit");
-    for (int i = 0; i < mPenerbitTable->rowCount(); i++) {
-        int currentPenerbitId = mPenerbitTable->record(i).field(idColumnIndexInPenerbit).value().toInt();
-        if (currentPenerbitId == penerbitId) {
-            this->ui->comboPenerbit->setCurrentIndex(i);
-            break;
-        }
-    }
+    mBookMapper.toFirst();
 }
 
 void EditDialog::setAddBook()
 {
     this->mBookId = -1;
     updatePenerbitCombo();
-    if (!this->mBookTable->insertRows(0, 1))
+    if (!this->mBookModel->insertRows(0, 1))
         qInfo() << "Insert row failed";
 
+    mBookMapper.removeMapping(ui->labelKodeBuku);
     this->ui->labelKodeBuku->setText("Buku Baru");
+    mBookMapper.toFirst();
 }
 
 void EditDialog::accept()
@@ -62,35 +108,24 @@ void EditDialog::accept()
         QSqlQuery query;
         query.exec("SELECT MAX(Kode_Buku) + 1 FROM Buku");
         query.first();
-        this->mBookTable->setData(this->mBookTable->index(0, mBookTable->fieldIndex("Kode_Buku")),
+        this->mBookModel->setData(this->mBookModel->index(0, mBookModel->fieldIndex("Kode_Buku")),
             query.value(0).toInt());
     }
-    this->mBookTable->setData(
-        this->mBookTable->index(0, mBookTable->fieldIndex("Judul")),
-        this->ui->editJudul->text());
-    this->mBookTable->setData(
-        this->mBookTable->index(0, mBookTable->fieldIndex("Pengarang")),
-        this->ui->editPengarang->text());
-    this->mBookTable->setData(
-        this->mBookTable->index(0, mBookTable->fieldIndex("Jml_Buku")),
-        this->ui->spinJumlahBuku->value());
-    this->mBookTable->setData(
-                        this->mBookTable->index(0, mBookTable->fieldIndex("Kode_Penerbit")),
-                        this->mPenerbitTable->record(
-                            this->ui->comboPenerbit->currentIndex()
-                                ).field(mPenerbitTable->fieldIndex("Kode_Penerbit")).value().toInt());
-    if (!this->mBookTable->submitAll()) {
+
+    if (!this->mBookModel->submitAll()) {
 
         qWarning() << "insert failed";
-        qWarning() << mBookTable->lastError();
+        qWarning() << mBookModel->lastError();
     }
     done(Accepted);
 }
 
 void EditDialog::updatePenerbitCombo()
 {
-    if (!mPenerbitTable->select()) qWarning() << "Select penerbit failed";
+    if (!mPenerbitModel->select()) qWarning() << "Select penerbit failed";
 
-    this->ui->comboPenerbit->setModel(mPenerbitTable);
-    this->ui->comboPenerbit->setModelColumn(mPenerbitTable->fieldIndex("Nama"));
+    this->ui->comboPenerbit->setModel(mPenerbitModel);
+    this->ui->comboPenerbit->setModelColumn(mPenerbitModel->fieldIndex("Nama"));
 }
+
+#include "editdialog.moc"
